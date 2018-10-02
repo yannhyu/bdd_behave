@@ -1,0 +1,43 @@
+C:\Users\yy250138\dev3\behavecode\bdd-example-before-impl
+(venv) λ python manage.py behave
+Creating test database for alias 'default'...
+Feature: My Lists # features/my_lists.feature:1
+  As a logged-in user
+  I want to be able to see all my lists in one page
+  So that I can find them all after I've written them
+  Scenario: Create two lists and see them on the My Lists page  # features/my_lists.feature:6
+    Given I am a logged-in user                                 # features/steps/my_lists.py:19
+Not Found: /404_no_such_url/
+    When I create a list with first item "Reticulate Splines"   # features/steps/my_lists.py:32
+Not Found: /favicon.ico
+    And I add an item "Immanentize Eschaton"                    # features/steps/my_lists.py:40
+    And I create a list with first item "Buy milk"              # features/steps/my_lists.py:32
+    Then I will see a link to "My lists"                        # functional_tests/base.py:12
+      Traceback (most recent call last):
+        ...
+
+          self.error_handler.check_response(response)
+        File "C:\Users\yy250138\dev3\behavecode\venv\lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 242, in check_response
+          raise exception_class(message, screen, stacktrace)
+      selenium.common.exceptions.NoSuchElementException: Message: Unable to locate element: My lists
+
+
+      Captured logging:
+      WARNING:django.request:Not Found: /404_no_such_url/
+      WARNING:django.request:Not Found: /favicon.ico
+
+    When I click the link to "My lists"                         # None
+    Then I will see a link to "Reticulate Splines"              # None
+    And I will see a link to "Buy milk"                         # None
+    When I click the link to "Reticulate Splines"               # None
+    Then I will be on the "Reticulate Splines" list page        # None
+
+
+Failing scenarios:
+  features/my_lists.feature:6  Create two lists and see them on the My Lists page
+
+0 features passed, 1 failed, 0 skipped
+0 scenarios passed, 1 failed, 0 skipped
+4 steps passed, 1 failed, 5 skipped, 0 undefined
+Took 0m18.119s
+Destroying test database for alias 'default'...
