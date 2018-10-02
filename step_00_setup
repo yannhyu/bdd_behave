@@ -1,0 +1,11 @@
+
+https://github.com/dihnatsyeu/blazemeter-behave
+https://dzone.com/articles/using-the-behave-framework-for-selenium-bdd-testin
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+python -m venv venv
+
+pip install behave
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

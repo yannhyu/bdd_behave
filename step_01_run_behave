@@ -1,0 +1,9 @@
+Execution Commands
+
+So far, we have executed our features using the simple command "behave". But the behave framework suggests different options for execution. The most useful ones:
+
+    --include, --exclude - to include or exclude features from test run.
+    --junit - if you would like to get a junit report. You can read more about JUnit on the official site.
+    -logging-level - to specify level of logging. By default INFO is selected, which means that all messages will be captured.
+    --logging-format - to define a format messages will be printed within.
+    --tags to filter scenarios that you would like to run. Only scenarios with the specified tag will be executed.
