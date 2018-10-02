@@ -1,0 +1,435 @@
+
+The Outside Layer: Presentation and Templates
+
+The test is currently failing saying that it can’t find a link saying "My Lists". We can address that at the presentation layer, in base.html, in our navigation bar. Here’s the minimal code change:
+lists/templates/base.html (ch19l002-1)
+
+  {% if user.email %}
+    <ul class="nav navbar-nav navbar-left">
+      <li><a href="#">My lists</a></li>
+    </ul>
+    <ul class="nav navbar-nav navbar-right">
+      <li class="navbar-text">Logged in as {{ user.email }}</li>
+      <li><a href="{% url 'logout' %}">Log out</a></li>
+    </ul>
+
+Of course, that link doesn’t actually go anywhere, but it does get us along to the next failure:
+
+$ python3 manage.py test functional_tests.test_my_lists
+[...]
+    lambda: self.browser.find_element_by_link_text('Reticulate splines')
+[...]
+selenium.common.exceptions.NoSuchElementException: Message: Unable to locate
+element: Reticulate splines
+
+Which is telling us we’re going to have to build a page that lists all of a user’s lists by title. Let’s start with the basics—​a URL and a placeholder template for it.
+
+Again, we can go outside-in, starting at the presentation layer with just the URL and nothing else:
+lists/templates/base.html (ch19l002-2)
+
+    <ul class="nav navbar-nav navbar-left">
+      <li><a href="{% url 'my_lists' user.email %}">My lists</a></li>
+    </ul>
+
+Moving Down One Layer to View Functions (the Controller)
+
+That will cause a template error, so we’ll start to move down from the presentation layer and URLs down to the controller layer, Django’s view functions.
+
+As always, we start with a test:
+lists/tests/test_views.py (ch19l003)
+
+class MyListsTest(TestCase):
+
+    def test_my_lists_url_renders_my_lists_template(self):
+        response = self.client.get('/lists/users/a@b.com/')
+        self.assertTemplateUsed(response, 'my_lists.html')
+
+That gives:
+
+AssertionError: No templates used to render the response
+
+And we fix it, still at the presentation level, in urls.py:
+lists/urls.py
+
+urlpatterns = [
+    url(r'^new$', views.new_list, name='new_list'),
+    url(r'^(\d+)/$', views.view_list, name='view_list'),
+    url(r'^users/(.+)/$', views.my_lists, name='my_lists'),
+]
+
+That gives us a test failure, which informs us of what we should do as we move down to the next level:
+
+AttributeError: module 'lists.views' has no attribute 'my_lists'
+
+We move in from the presentation layer to the views layer, and create a minimal placeholder:
+lists/views.py (ch19l005)
+
+def my_lists(request, email):
+    return render(request, 'my_lists.html')
+
+And a minimal template:
+lists/templates/my_lists.html
+
+{% extends 'base.html' %}
+
+{% block header_text %}My Lists{% endblock %}
+
+That gets our unit tests passing, but our FT is still at the same point, saying that the "My Lists" page doesn’t yet show any lists. It wants them to be clickable links named after the first item:
+
+$ python3 manage.py test functional_tests.test_my_lists
+[...]
+selenium.common.exceptions.NoSuchElementException: Message: Unable to locate
+element: Reticulate splines
+
+
+
+
+
+Another Pass, Outside-In
+
+At each stage, we still let the FT drive what development we do.
+
+Starting again at the outside layer, in the template, we begin to write the template code we’d like to use to get the "My Lists" page to work the way we want it to. As we do so, we start to specify the API we want from the code at the layers below.
+A Quick Restructure of the Template Inheritance Hierarchy
+
+Currently there’s no place in our base template for us to put any new content. Also, the "My Lists" page doesn’t need the new item form, so we’ll put that into a block too, making it optional:
+lists/templates/base.html (ch19l007-1)
+
+      <div class="row">
+        <div class="col-md-6 col-md-offset-3 jumbotron">
+          <div class="text-center">
+            <h1>{% block header_text %}{% endblock %}</h1>
+            {% block list_form %}
+              <form method="POST" action="{% block form_action %}{% endblock %}">
+                {{ form.text }}
+                {% csrf_token %}
+                {% if form.errors %}
+                  <div class="form-group has-error">
+                    <div class="help-block">{{ form.text.errors }}</div>
+                  </div>
+                {% endif %}
+              </form>
+            {% endblock %}
+          </div>
+        </div>
+      </div>
+
+lists/templates/base.html (ch19l007-2)
+
+      <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+          {% block table %}
+          {% endblock %}
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+          {% block extra_content %}
+          {% endblock %}
+        </div>
+      </div>
+
+    </div>
+    <script src="/static/jquery-3.1.1.min.js"></script>
+    [...]
+
+Designing Our API Using the Template
+
+Meanwhile, in my_lists.html we override the list_form and say it should be empty…​
+lists/templates/my_lists.html
+
+{% extends 'base.html' %}
+
+{% block header_text %}My Lists{% endblock %}
+
+{% block list_form %}{% endblock %}
+
+And then we can just work inside the extra_content block:
+lists/templates/my_lists.html
+
+[...]
+
+{% block list_form %}{% endblock %}
+
+{% block extra_content %}
+    <h2>{{ owner.email }}'s lists</h2>  
+    <ul>
+        {% for list in owner.list_set.all %}  
+            <li><a href="{{ list.get_absolute_url }}">{{ list.name }}</a></li>  
+        {% endfor %}
+    </ul>
+{% endblock %}
+
+We’ve made several design decisions in this template which are going to filter their way down through the code:
+  We want a variable called owner to represent the user in our template.
+  We want to be able to iterate through the lists created by the user using owner.list_set.all (I happen to know we get this for free from the Django ORM).
+  We want to use list.name to print out the "name" of the list, which is currently specified as the text of its first element.
+  Outside-In TDD is sometimes called "programming by wishful thinking", and you can see why. We start writing code at the higher levels based on what we wish we had at the lower levels, even though it doesn’t exist yet!
+
+We can rerun our FTs, to check that we didn’t break anything, and to see whether we’ve got any further:
+
+$ python manage.py test functional_tests
+[...]
+selenium.common.exceptions.NoSuchElementException: Message: Unable to locate
+element: Reticulate splines
+
+ ---------------------------------------------------------------------
+Ran 8 tests in 77.613s
+
+FAILED (errors=1)
+
+Well, no further, but at least we didn’t break anything. Time for a commit:
+
+$ git add lists
+$ git diff --staged
+$ git commit -m "url, placeholder view, and first-cut templates for my_lists"
+
+Moving Down to the Next Layer: What the View Passes to the Template
+
+Now our views layer needs to respond to the requirements we’ve laid out in the template layer, by giving it the objects it needs. In this case, the list owner:
+lists/tests/test_views.py (ch19l011)
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+[...]
+class MyListsTest(TestCase):
+
+    def test_my_lists_url_renders_my_lists_template(self):
+        [...]
+
+    def test_passes_correct_owner_to_template(self):
+        User.objects.create(email='wrong@owner.com')
+        correct_user = User.objects.create(email='a@b.com')
+        response = self.client.get('/lists/users/a@b.com/')
+        self.assertEqual(response.context['owner'], correct_user)
+
+Gives:
+
+KeyError: 'owner'
+
+So:
+lists/views.py (ch19l012)
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+[...]
+
+def my_lists(request, email):
+    owner = User.objects.get(email=email)
+    return render(request, 'my_lists.html', {'owner': owner})
+
+That gets our new test passing, but we’ll also see an error from the previous test. We just need to add a user for it as well:
+lists/tests/test_views.py (ch19l013)
+
+    def test_my_lists_url_renders_my_lists_template(self):
+        User.objects.create(email='a@b.com')
+        [...]
+
+And we get to an OK:
+
+OK
+
+
+
+
+
+The Next "Requirement" from the Views Layer: New Lists Should Record Owner
+
+Before we move down to the model layer, there’s another part of the code at the views layer that will need to use our model: we need some way for newly created lists to be assigned to an owner, if the current user is logged in to the site.
+
+Here’s a first crack at writing the test:
+lists/tests/test_views.py (ch19l014)
+
+class NewListTest(TestCase):
+    [...]
+
+    def test_list_owner_is_saved_if_user_is_authenticated(self):
+        user = User.objects.create(email='a@b.com')
+        self.client.force_login(user)  
+        self.client.post('/lists/new', data={'text': 'new item'})
+        list_ = List.objects.first()
+        self.assertEqual(list_.owner, user)
+
+  force_login() is the way you get the test client to make requests with a logged-in user.
+
+The test fails as follows:
+
+AttributeError: 'List' object has no attribute 'owner'
+
+To fix this, we can try writing code like this:
+lists/views.py (ch19l015)
+
+def new_list(request):
+    form = ItemForm(data=request.POST)
+    if form.is_valid():
+        list_ = List()
+        list_.owner = request.user
+        list_.save()
+        form.save(for_list=list_)
+        return redirect(list_)
+    else:
+        return render(request, 'home.html', {"form": form})
+
+But it won’t actually work, because we don’t know how to save a list owner yet:
+
+    self.assertEqual(list_.owner, user)
+AttributeError: 'List' object has no attribute 'owner'
+
+A Decision Point: Whether to Proceed to the Next Layer with a Failing Test
+
+In order to get this test passing, as it’s written now, we have to move down to the model layer. However, it means doing more work with a failing test, which is not ideal.
+
+The alternative is to rewrite the test to make it more isolated from the level below, using mocks.
+
+On the one hand, it’s a lot more effort to use mocks, and it can lead to tests that are harder to read. On the other hand, imagine if our app was more complex, and there were several more layers between the outside and the inside. Imagine leaving three or four or five layers of tests, all failing while we wait to get to the bottom layer to implement our critical feature. While tests are failing, we’re not sure that layer really works, on its own terms, or not. We have to wait until we get to the bottom layer.
+
+This is a decision point you’re likely to run into in your own projects. Let’s investigate both approaches. We’ll start by taking the shortcut, and leaving the test failing. In the next chapter, we’ll come back to this exact point, and investigate how things would have gone if we’d used more isolation.
+
+Let’s do a commit, and then tag the commit as a way of remembering our position for the next chapter:
+
+$ git commit -am "new_list view tries to assign owner but cant"
+$ git tag revisit_this_point_with_isolated_tests
+
+
+
+Moving Down to the Model Layer
+
+Our outside-in design has driven out two requirements for the model layer: we want to be able to assign an owner to a list using the attribute .owner, and we want to be able to access the list’s owner with the API owner.list_set.all.
+
+Let’s write a test for that:
+lists/tests/test_models.py (ch19l018)
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+[...]
+
+class ListModelTest(TestCase):
+
+    def test_get_absolute_url(self):
+        [...]
+
+    def test_lists_can_have_owners(self):
+        user = User.objects.create(email='a@b.com')
+        list_ = List.objects.create(owner=user)
+        self.assertIn(list_, user.list_set.all())
+
+And that gives us a new unit test failure:
+
+    list_ = List.objects.create(owner=user)
+    [...]
+TypeError: 'owner' is an invalid keyword argument for this function
+
+The naive implementation would be this:
+
+from django.conf import settings
+[...]
+
+class List(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL)
+
+But we want to make sure the list owner is optional. Explicit is better than implicit, and tests are documentation, so let’s have a test for that too:
+lists/tests/test_models.py (ch19l020)
+
+    def test_list_owner_is_optional(self):
+        List.objects.create()  # should not raise
+
+The correct implementation is this:
+lists/models.py
+
+from django.conf import settings
+[...]
+
+class List(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, blank=True, null=True)
+
+    def get_absolute_url(self):
+        return reverse('view_list', args=[self.id])
+
+Now running the tests gives the usual database error:
+
+    return Database.Cursor.execute(self, query, params)
+django.db.utils.OperationalError: no such column: lists_list.owner_id
+
+Because we need to make some migrations:
+
+$ python manage.py makemigrations
+Migrations for 'lists':
+  lists/migrations/0006_list_owner.py
+    - Add field owner to list
+
+We’re almost there; a couple more failures:
+
+ERROR: test_redirects_after_POST (lists.tests.test_views.NewListTest)
+[...]
+ValueError: Cannot assign "<SimpleLazyObject:
+<django.contrib.auth.models.AnonymousUser object at 0x7f364795ef90>>":
+"List.owner" must be a "User" instance.
+ERROR: test_can_save_a_POST_request (lists.tests.test_views.NewListTest)
+
+[...]
+ValueError: Cannot assign "<SimpleLazyObject:
+<django.contrib.auth.models.AnonymousUser object at 0x7f364795ef90>>":
+"List.owner" must be a "User" instance.
+
+We’re moving back up to the views layer now, just doing a little tidying up. Notice that these are in the old test for the new_list view, when we haven’t got a logged-in user. We should only save the list owner when the user is actually logged in. The .is_authenticated attribute we defined in [chapter_mocking] comes in useful now (when they’re not logged in, Django represents users using a class called AnonymousUser, whose .is_authenticated is always False):
+lists/views.py (ch19l023)
+
+    if form.is_valid():
+        list_ = List()
+        if request.user.is_authenticated:
+            list_.owner = request.user
+        list_.save()
+        form.save(for_list=list_)
+        [...]
+
+And that gets us passing!
+
+$ python manage.py test lists
+[...]
+.......................................
+ ---------------------------------------------------------------------
+Ran 39 tests in 0.237s
+
+OK
+
+This is a good time for a commit:
+
+$ git add lists
+$ git commit -m "lists can have owners, which are saved on creation."
+
+
+
+
+Final Step: Feeding Through the .name API from the Template
+
+The last thing our outside-in design wanted came from the templates, which wanted to be able to access a list "name" based on the text of its first item:
+lists/tests/test_models.py (ch19l024)
+
+    def test_list_name_is_first_item_text(self):
+        list_ = List.objects.create()
+        Item.objects.create(list=list_, text='first item')
+        Item.objects.create(list=list_, text='second item')
+        self.assertEqual(list_.name, 'first item')
+
+lists/models.py (ch19l025)
+
+    @property
+    def name(self):
+        return self.item_set.first().text
+
+And that, believe it or not, actually gets us a passing test, and a working "My Lists" page (The "My Lists" page, in all its glory (and proof I did test on Windows))!
+
+$ python manage.py test functional_tests
+[...]
+Ran 8 tests in 93.819s
+
+OK
+
+The @property Decorator in Python
+
+If you haven’t seen it before, the @property decorator transforms a method on a class to make it appear to the outside world like an attribute.
+
+This is a powerful feature of the language, because it makes it easy to implement "duck typing", to change the implementation of a property without changing the interface of the class. In other words, if we decide to change .name into being a "real" attribute on the model, which is stored as text in the database, then we will be able to do so entirely transparently—​as far as the rest of our code is concerned, they will still be able to just access .name and get the list name, without needing to know about the implementation. Raymond Hettinger gave a great, beginner-friendly talk on this topic at Pycon a few years ago, which I enthusiastically recommend (it covers about a million good practices for Pythonic class design besides).
+
+Of course, in the Django template language, .name would still call the method even if it didn’t have @property, but that’s a particularity of Django, and doesn’t apply to Python in general…​

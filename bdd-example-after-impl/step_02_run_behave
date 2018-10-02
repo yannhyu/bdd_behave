@@ -1,0 +1,26 @@
+C:\Users\yy250138\dev3\behavecode\bdd-example-after-impl
+(venv) λ python manage.py behave
+Creating test database for alias 'default'...
+Feature: My Lists # features/my_lists.feature:1
+  As a logged-in user
+  I want to be able to see all my lists in one page
+  So that I can find them all after I've written them
+  Scenario: Create two lists and see them on the My Lists page  # features/my_lists.feature:6
+    Given I am a logged-in user                                 # features/steps/my_lists.py:19
+Not Found: /404_no_such_url/
+    When I create a list with first item "Reticulate Splines"   # features/steps/my_lists.py:32
+Not Found: /favicon.ico
+    And I add an item "Immanentize Eschaton"                    # features/steps/my_lists.py:40
+    And I create a list with first item "Buy milk"              # features/steps/my_lists.py:32
+    Then I will see a link to "My lists"                        # functional_tests/base.py:12
+    When I click the link to "My lists"                         # features/steps/my_lists.py:53
+    Then I will see a link to "Reticulate Splines"              # functional_tests/base.py:12
+    And I will see a link to "Buy milk"                         # functional_tests/base.py:12
+    When I click the link to "Reticulate Splines"               # features/steps/my_lists.py:53
+    Then I will be on the "Reticulate Splines" list page        # functional_tests/base.py:12
+
+1 feature passed, 0 failed, 0 skipped
+1 scenario passed, 0 failed, 0 skipped
+10 steps passed, 0 failed, 0 skipped, 0 undefined
+Took 0m8.281s
+Destroying test database for alias 'default'...
